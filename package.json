@@ -1,0 +1,52 @@
+{
+  "name": "water-collection-invoice-system",
+  "version": "1.0.0",
+  "description": "Professional web application for room-wise monthly water billing management",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:backend && npm run install:frontend",
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "npm run build:backend && npm run build:frontend",
+    "build:backend": "cd backend && npm run build",
+    "build:frontend": "cd frontend && npm run build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd backend && npm test",
+    "test:frontend": "cd frontend && npm test",
+    "lint": "npm run lint:backend && npm run lint:frontend",
+    "lint:backend": "cd backend && npm run lint",
+    "lint:frontend": "cd frontend && npm run lint",
+    "start": "npm run start:backend",
+    "start:backend": "cd backend && npm start"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": [
+    "water",
+    "billing",
+    "invoice",
+    "management",
+    "react",
+    "nodejs",
+    "mongodb",
+    "whatsapp"
+  ],
+  "author": "Water Collection System Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/water-collection-invoice-system.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/water-collection-invoice-system/issues"
+  },
+  "homepage": "https://github.com/your-org/water-collection-invoice-system#readme"
+}
