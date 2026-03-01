@@ -1,25 +1,23 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
+import { LoadingSpinner } from '../common/LoadingSpinner';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'admin' | 'staff';
+  staffRedirect?: string;
 }
 
-export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ 
-  children, 
-  requiredRole 
-}) => {
-  // TODO: Implement actual authentication check
-  const isAuthenticated = localStorage.getItem('token') !== null;
-  const userRole = localStorage.getItem('userRole') || 'staff';
+export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole, staffRedirect = '/payments' }) => {
+  const { isAuthenticated, user, loading } = useAuth();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
+  if (loading) return <LoadingSpinner />;
 
-  if (requiredRole && userRole !== requiredRole && userRole !== 'admin') {
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (requiredRole === 'admin' && user?.role !== 'admin') {
+    return <Navigate to={staffRedirect} replace />;
   }
 
   return <>{children}</>;

@@ -1,18 +1,14 @@
 import React, { useState } from 'react';
-import {
-  Box,
-  TextField,
-  Button,
-  Typography,
-  Alert,
-} from '@mui/material';
+import { Box, TextField, Button, Typography, Alert } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const LoginPage: React.FC = () => {
   const [credentials, setCredentials] = useState({ username: '', password: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,17 +16,10 @@ export const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      // TODO: Implement actual authentication
-      // For now, simulate login
-      if (credentials.username && credentials.password) {
-        localStorage.setItem('token', 'dummy-token');
-        localStorage.setItem('userRole', 'admin');
-        navigate('/');
-      } else {
-        setError('Please enter username and password');
-      }
-    } catch (err) {
-      setError('Login failed. Please try again.');
+      await login(credentials.username, credentials.password);
+      navigate('/');
+    } catch (err: any) {
+      setError(err.response?.data?.error?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -43,33 +32,29 @@ export const LoginPage: React.FC = () => {
           {error}
         </Alert>
       )}
-      
+
       <TextField
         margin="normal"
         required
         fullWidth
-        id="username"
         label="Username"
-        name="username"
         autoComplete="username"
         autoFocus
         value={credentials.username}
         onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
       />
-      
+
       <TextField
         margin="normal"
         required
         fullWidth
-        name="password"
         label="Password"
         type="password"
-        id="password"
         autoComplete="current-password"
         value={credentials.password}
         onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
       />
-      
+
       <Button
         type="submit"
         fullWidth
@@ -79,9 +64,9 @@ export const LoginPage: React.FC = () => {
       >
         {loading ? 'Signing In...' : 'Sign In'}
       </Button>
-      
+
       <Typography variant="body2" color="text.secondary" align="center">
-        Demo credentials: admin / password
+        Default: admin / admin123
       </Typography>
     </Box>
   );
