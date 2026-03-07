@@ -17,7 +17,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       await login(credentials.username, credentials.password);
-      navigate('/');
+      navigate('/admin');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Login failed. Please try again.');
     } finally {

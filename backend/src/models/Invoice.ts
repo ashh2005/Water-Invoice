@@ -10,8 +10,9 @@ export interface IInvoice extends Document {
   paymentMethod: 'Cash' | 'Online';
   pendingMonths: number;
   pendingAmount: number;
-  smsSent: boolean;
-  smsError?: string;
+  whatsappSent: boolean;
+  whatsappSentBy?: Types.ObjectId;
+  whatsappSentAt?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -63,12 +64,16 @@ const invoiceSchema = new Schema<IInvoice>(
       default: 0,
       min: 0,
     },
-    smsSent: {
+    whatsappSent: {
       type: Boolean,
       default: false,
     },
-    smsError: {
-      type: String,
+    whatsappSentBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    whatsappSentAt: {
+      type: Date,
     },
   },
   { timestamps: true }

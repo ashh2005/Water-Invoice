@@ -35,7 +35,7 @@ interface DashboardLayoutProps {
 }
 
 const menuItems = [
-  { text: 'Dashboard', icon: <Dashboard />, path: '/', adminOnly: true },
+  { text: 'Dashboard', icon: <Dashboard />, path: '/admin', adminOnly: true },
   { text: 'Guntas', icon: <Landscape />, path: '/guntas', adminOnly: true },
   { text: 'Customers', icon: <People />, path: '/customers', adminOnly: true },
   { text: 'Payments', icon: <Payment />, path: '/payments' },
@@ -58,7 +58,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate('/admin-login');
   };
 
   const sidebar = (

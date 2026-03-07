@@ -314,7 +314,7 @@ export const CustomerManagementPage: React.FC = () => {
             <strong>Password:</strong> {createdCreds?.password}
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Share these credentials with the customer so they can log in at /customer-login
+            Share these credentials with the customer so they can log in at /login
           </Typography>
         </DialogContent>
         <DialogActions>

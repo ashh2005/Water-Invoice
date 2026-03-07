@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { Box } from '@mui/material';
 
 import { AuthLayout } from './layouts/AuthLayout';
@@ -14,22 +14,24 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { CustomerLoginPage } from './pages/customer-portal/CustomerLoginPage';
 import { CustomerDashboardPage } from './pages/customer-portal/CustomerDashboardPage';
 import { CustomerProtectedRoute } from './components/customer-portal/CustomerProtectedRoute';
-import { LoadingSpinner } from './components/common/LoadingSpinner';
 
 function App() {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
       <Routes>
-        <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
+        <Route path="/admin-login" element={<AuthLayout><LoginPage /></AuthLayout>} />
 
         {/* Customer Portal Routes */}
-        <Route path="/customer-login" element={<CustomerLoginPage />} />
-        <Route path="/customer-dashboard" element={
+        <Route path="/login" element={<CustomerLoginPage />} />
+        <Route path="/dashboard" element={
           <CustomerProtectedRoute><CustomerDashboardPage /></CustomerProtectedRoute>
         } />
 
+        {/* Default route redirects to customer login */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
         {/* Admin/Staff Routes */}
-        <Route path="/" element={
+        <Route path="/admin" element={
           <ProtectedRoute requiredRole="admin"><DashboardLayout><DashboardPage /></DashboardLayout></ProtectedRoute>
         } />
 
@@ -53,11 +55,7 @@ function App() {
           <ProtectedRoute requiredRole="admin"><DashboardLayout><ReportsPage /></DashboardLayout></ProtectedRoute>
         } />
 
-        <Route path="*" element={
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-            <LoadingSpinner />
-          </Box>
-        } />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </Box>
   );

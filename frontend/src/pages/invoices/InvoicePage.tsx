@@ -5,9 +5,10 @@ import {
   FormControl, InputLabel, Select, MenuItem, Dialog, DialogTitle,
   DialogContent, DialogActions, Button, Grid, Divider, Tooltip,
 } from '@mui/material';
-import { Visibility, Sms, PictureAsPdf } from '@mui/icons-material';
+import { Visibility, PictureAsPdf } from '@mui/icons-material';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { PageHeader } from '../../components/common/PageHeader';
-import { useInvoices, useResendSMS } from '../../hooks/useInvoices';
+import { useInvoices, useMarkWhatsappSent } from '../../hooks/useInvoices';
 import { Invoice, Customer } from '../../types';
 import jsPDF from 'jspdf';
 
@@ -22,7 +23,32 @@ export const InvoicePage: React.FC = () => {
     toDate: toDate || undefined,
     paymentMethod: paymentMethod || undefined,
   });
-  const resendSMS = useResendSMS();
+  const markWhatsappSent = useMarkWhatsappSent();
+
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const formatMonthRange = (from: string, to: string): string => {
+    const months: string[] = [];
+    const [fy, fm] = from.split('-').map(Number);
+    const [ty, tm] = to.split('-').map(Number);
+    let y = fy, m = fm;
+    while (y < ty || (y === ty && m <= tm)) {
+      months.push(`${monthNames[m - 1]} ${y}`);
+      m++;
+      if (m > 12) { m = 1; y++; }
+    }
+    return months.join(', ');
+  };
+
+  const handleSendWhatsApp = (inv: Invoice) => {
+    const customer = getCustomer(inv);
+    if (!customer?.mobile) return;
+    const monthsText = formatMonthRange(inv.paidFromMonth, inv.paidToMonth);
+    const message = `Your payment for month(s) ${monthsText} has been received for amount Rs. ${inv.amountPaid}`;
+    const phone = customer.mobile.startsWith('+') ? customer.mobile.slice(1) : `91${customer.mobile}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+    markWhatsappSent.mutate(inv._id);
+  };
 
   const getCustomer = (inv: Invoice): Customer | null => {
     return typeof inv.customerId === 'object' ? inv.customerId as Customer : null;
@@ -88,7 +114,7 @@ export const InvoicePage: React.FC = () => {
                 <TableCell>Period</TableCell>
                 <TableCell>Amount</TableCell>
                 <TableCell>Method</TableCell>
-                <TableCell>SMS</TableCell>
+                <TableCell>WhatsApp</TableCell>
                 <TableCell align="right">Actions</TableCell>
               </TableRow>
             </TableHead>
@@ -107,11 +133,13 @@ export const InvoicePage: React.FC = () => {
                       <Chip label={inv.paymentMethod} size="small" color={inv.paymentMethod === 'Cash' ? 'success' : 'primary'} />
                     </TableCell>
                     <TableCell>
-                      <Chip label={inv.smsSent ? 'Sent' : 'Failed'} size="small" color={inv.smsSent ? 'success' : 'error'} variant="outlined" />
+                      <Chip label={inv.whatsappSent ? 'Sent' : 'Pending'} size="small" color={inv.whatsappSent ? 'success' : 'warning'} variant="outlined" />
                     </TableCell>
                     <TableCell align="right">
                       <Tooltip title="View"><IconButton size="small" onClick={() => setViewInvoice(inv)}><Visibility fontSize="small" /></IconButton></Tooltip>
-                      <Tooltip title="Resend SMS"><IconButton size="small" onClick={() => resendSMS.mutate(inv._id)} disabled={resendSMS.isPending}><Sms fontSize="small" /></IconButton></Tooltip>
+                      {!inv.whatsappSent && (
+                        <Tooltip title="Send WhatsApp"><IconButton size="small" color="success" onClick={() => handleSendWhatsApp(inv)}><WhatsAppIcon fontSize="small" /></IconButton></Tooltip>
+                      )}
                       <Tooltip title="Download PDF"><IconButton size="small" onClick={() => handleDownloadPDF(inv)}><PictureAsPdf fontSize="small" /></IconButton></Tooltip>
                     </TableCell>
                   </TableRow>
@@ -139,6 +167,14 @@ export const InvoicePage: React.FC = () => {
                 <Grid item xs={6}><Typography color="text.secondary">Method</Typography><Chip label={viewInvoice.paymentMethod} size="small" /></Grid>
                 <Grid item xs={6}><Typography color="text.secondary">Pending Amount</Typography><Typography color="error">Rs. {viewInvoice.pendingAmount}</Typography></Grid>
                 <Grid item xs={6}><Typography color="text.secondary">Pending Months</Typography><Typography>{viewInvoice.pendingMonths}</Typography></Grid>
+                <Grid item xs={12}><Divider /></Grid>
+                <Grid item xs={6}><Typography color="text.secondary">WhatsApp</Typography><Chip label={viewInvoice.whatsappSent ? 'Sent' : 'Pending'} size="small" color={viewInvoice.whatsappSent ? 'success' : 'warning'} variant="outlined" /></Grid>
+                {viewInvoice.whatsappSent && viewInvoice.whatsappSentBy && typeof viewInvoice.whatsappSentBy === 'object' && (
+                  <>
+                    <Grid item xs={6}><Typography color="text.secondary">Sent By</Typography><Typography>{viewInvoice.whatsappSentBy.username} ({viewInvoice.whatsappSentBy.role})</Typography></Grid>
+                    <Grid item xs={6}><Typography color="text.secondary">Sent At</Typography><Typography>{viewInvoice.whatsappSentAt ? new Date(viewInvoice.whatsappSentAt).toLocaleString() : '-'}</Typography></Grid>
+                  </>
+                )}
               </Grid>
             </DialogContent>
             <DialogActions>

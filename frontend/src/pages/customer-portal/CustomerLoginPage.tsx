@@ -21,7 +21,7 @@ export const CustomerLoginPage: React.FC = () => {
 
     try {
       await login(username, password);
-      navigate('/customer-dashboard');
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.response?.data?.error?.message || 'Login failed. Please check your credentials.');
     } finally {

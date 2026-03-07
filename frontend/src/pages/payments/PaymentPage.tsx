@@ -6,12 +6,28 @@ import {
 } from '@mui/material';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useRecordCashPayment, useCreateOnlinePayment } from '../../hooks/usePayments';
-import { useInvoices } from '../../hooks/useInvoices';
+import { useInvoices, useMarkWhatsappSent } from '../../hooks/useInvoices';
 import { Customer, Gunta, Invoice } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { PageHeader } from '../../components/common/PageHeader';
 
 const steps = ['Search Customer', 'Select Period', 'Payment', 'Result'];
+
+const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatMonthRange(from: string, to: string): string {
+  const months: string[] = [];
+  const [fy, fm] = from.split('-').map(Number);
+  const [ty, tm] = to.split('-').map(Number);
+  let y = fy, m = fm;
+  while (y < ty || (y === ty && m <= tm)) {
+    months.push(`${monthNames[m - 1]} ${y}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return months.join(', ');
+}
 
 function monthDiff(from: string, to: string): number {
   const [fy, fm] = from.split('-').map(Number);
@@ -31,6 +47,7 @@ export const PaymentPage: React.FC = () => {
   const { data: customers, isLoading: customersLoading } = useCustomers({ status: 'Rented' });
   const cashMutation = useRecordCashPayment();
   const onlineMutation = useCreateOnlinePayment();
+  const markWhatsappSent = useMarkWhatsappSent();
   const { data: customerInvoices } = useInvoices(
     selectedCustomer ? { customerId: selectedCustomer._id } : undefined
   );
@@ -315,7 +332,7 @@ export const PaymentPage: React.FC = () => {
                 <Typography>Method: {result.invoice.paymentMethod}</Typography>
                 <Divider sx={{ my: 1 }} />
                 <Typography variant="body2" color="text.secondary">
-                  SMS {result.invoice.smsSent ? 'sent to customer' : 'will be sent automatically'}
+                  WhatsApp: {result.invoice.whatsappSent ? 'Sent' : 'Not yet sent'}
                 </Typography>
 
                 {result.razorpayOrder && (
@@ -329,7 +346,26 @@ export const PaymentPage: React.FC = () => {
                 )}
               </CardContent>
             </Card>
-            <Button variant="contained" sx={{ mt: 3 }} onClick={handleReset}>New Payment</Button>
+            <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center' }}>
+              <Button variant="contained" onClick={handleReset}>New Payment</Button>
+              {selectedCustomer?.mobile && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  startIcon={<WhatsAppIcon />}
+                  onClick={() => {
+                    const monthsText = formatMonthRange(result.invoice.paidFromMonth, result.invoice.paidToMonth);
+                    const message = `Your payment for month(s) ${monthsText} has been received for amount Rs. ${result.invoice.amountPaid}`;
+                    const phone = selectedCustomer.mobile.startsWith('+') ? selectedCustomer.mobile.slice(1) : `91${selectedCustomer.mobile}`;
+                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                    markWhatsappSent.mutate(result.invoice._id);
+                    setResult({ ...result, invoice: { ...result.invoice, whatsappSent: true } });
+                  }}
+                >
+                  Send WhatsApp
+                </Button>
+              )}
+            </Box>
           </Box>
         )}
       </Paper>

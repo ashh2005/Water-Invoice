@@ -1,8 +1,9 @@
 import { Request, Response } from 'express';
 import * as invoiceService from '../services/invoiceService';
-import { resendInvoiceSMS } from '../services/notificationService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/apiResponse';
+import { Invoice } from '../models/Invoice';
+import { AuthRequest } from '../middleware/auth';
 
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
   const { customerId, fromDate, toDate, paymentMethod } = req.query;
@@ -20,7 +21,15 @@ export const getById = asyncHandler(async (req: Request, res: Response) => {
   sendSuccess(res, invoice);
 });
 
-export const resendSMS = asyncHandler(async (req: Request, res: Response) => {
-  const sent = await resendInvoiceSMS(req.params.id);
-  sendSuccess(res, { sent }, sent ? 'SMS sent successfully' : 'SMS delivery failed');
+export const markWhatsappSent = asyncHandler(async (req: AuthRequest, res: Response) => {
+  const invoice = await Invoice.findByIdAndUpdate(
+    req.params.id,
+    {
+      whatsappSent: true,
+      whatsappSentBy: req.user!._id,
+      whatsappSentAt: new Date(),
+    },
+    { new: true }
+  ).populate('whatsappSentBy', 'username role');
+  sendSuccess(res, invoice, 'WhatsApp message marked as sent');
 });

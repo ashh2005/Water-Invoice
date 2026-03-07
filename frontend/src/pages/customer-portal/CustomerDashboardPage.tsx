@@ -23,7 +23,7 @@ export const CustomerDashboardPage: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/customer-login');
+    navigate('/login');
   };
 
   const handlePay = async () => {

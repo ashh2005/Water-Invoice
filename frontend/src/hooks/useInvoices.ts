@@ -12,14 +12,13 @@ export const useInvoices = (filters?: {
 export const useInvoice = (id: string) =>
   useQuery({ queryKey: ['invoices', id], queryFn: () => invoiceService.getInvoiceById(id), enabled: !!id });
 
-export const useResendSMS = () => {
+export const useMarkWhatsappSent = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: invoiceService.resendSMS,
-    onSuccess: (data) => {
+    mutationFn: invoiceService.markWhatsappSent,
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] });
-      toast.success(data.sent ? 'SMS sent successfully' : 'SMS delivery failed');
     },
-    onError: (err: any) => toast.error(err.response?.data?.error?.message || 'Failed to send SMS'),
+    onError: (err: any) => toast.error(err.response?.data?.error?.message || 'Failed to update'),
   });
 };

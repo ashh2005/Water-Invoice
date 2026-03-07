@@ -2,7 +2,6 @@ import { Payment } from '../models/Payment';
 import { Customer } from '../models/Customer';
 import { createInvoiceFromPayment } from './invoiceService';
 import { createOrder, verifySignature } from './razorpayService';
-import { sendPaymentConfirmationSMS } from './notificationService';
 import { AppError } from '../utils/AppError';
 
 export const recordCashPayment = async (data: {
@@ -26,11 +25,6 @@ export const recordCashPayment = async (data: {
     paymentMethod: 'Cash',
     status: 'completed',
   });
-
-  // Auto-send SMS (non-blocking)
-  sendPaymentConfirmationSMS(String(invoice._id)).catch(err =>
-    console.error('SMS send failed:', err.message)
-  );
 
   return { invoice, payment };
 };
@@ -87,11 +81,6 @@ export const handlePaymentWebhook = async (data: {
   payment.razorpaySignature = data.razorpaySignature;
   payment.status = 'completed';
   await payment.save();
-
-  // Auto-send SMS
-  sendPaymentConfirmationSMS(payment.invoiceId as any).catch(err =>
-    console.error('SMS send failed:', err.message)
-  );
 
   return payment;
 };

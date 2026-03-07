@@ -12,7 +12,7 @@ export const CustomerProtectedRoute: React.FC<CustomerProtectedRouteProps> = ({ 
 
   if (loading) return <LoadingSpinner />;
 
-  if (!isAuthenticated) return <Navigate to="/customer-login" replace />;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
 };

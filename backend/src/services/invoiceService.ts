@@ -154,6 +154,7 @@ export const getInvoices = async (filters: {
       select: 'nameEnglish nameHindi mobile roomNumber guntaId monthlyCharge',
       populate: { path: 'guntaId', select: 'name' },
     })
+    .populate('whatsappSentBy', 'username role')
     .sort({ createdAt: -1 });
 };
 
@@ -163,7 +164,8 @@ export const getInvoiceById = async (id: string) => {
       path: 'customerId',
       select: 'nameEnglish nameHindi mobile address roomNumber guntaId monthlyCharge',
       populate: { path: 'guntaId', select: 'name' },
-    });
+    })
+    .populate('whatsappSentBy', 'username role');
   if (!invoice) throw new AppError('Invoice not found', 404);
   return invoice;
 };

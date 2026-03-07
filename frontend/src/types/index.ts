@@ -47,8 +47,9 @@ export interface Invoice {
   paymentMethod: 'Cash' | 'Online';
   pendingMonths: number;
   pendingAmount: number;
-  smsSent: boolean;
-  smsError?: string;
+  whatsappSent: boolean;
+  whatsappSentBy?: { _id: string; username: string; role: string } | string;
+  whatsappSentAt?: string;
   createdAt: string;
   updatedAt: string;
 }

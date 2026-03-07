@@ -14,7 +14,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
 
   if (loading) return <LoadingSpinner />;
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!isAuthenticated) return <Navigate to="/admin-login" replace />;
 
   if (requiredRole === 'admin' && user?.role !== 'admin') {
     return <Navigate to={staffRedirect} replace />;

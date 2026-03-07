@@ -20,7 +20,7 @@ portalApi.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('customerToken');
       localStorage.removeItem('customerUser');
-      window.location.href = '/customer-login';
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }

@@ -16,7 +16,7 @@ export const getInvoiceById = async (id: string): Promise<Invoice> => {
   return data.data;
 };
 
-export const resendSMS = async (id: string): Promise<{ sent: boolean }> => {
-  const { data } = await api.post<ApiResponse<{ sent: boolean }>>(`/invoices/${id}/resend-sms`);
+export const markWhatsappSent = async (id: string): Promise<Invoice> => {
+  const { data } = await api.post<ApiResponse<Invoice>>(`/invoices/${id}/mark-whatsapp-sent`);
   return data.data;
 };
