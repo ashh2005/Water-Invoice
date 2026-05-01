@@ -6,6 +6,7 @@ export const getInvoices = async (filters?: {
   fromDate?: string;
   toDate?: string;
   paymentMethod?: string;
+  customerName?: string;
 }): Promise<Invoice[]> => {
   const { data } = await api.get<ApiResponse<Invoice[]>>('/invoices', { params: filters });
   return data.data;

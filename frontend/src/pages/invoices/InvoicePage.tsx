@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box, Paper, Table, TableHead, TableRow, TableCell, TableBody,
   IconButton, Typography, CircularProgress, TextField, Chip,
@@ -17,11 +17,19 @@ export const InvoicePage: React.FC = () => {
   const [toDate, setToDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [viewInvoice, setViewInvoice] = useState<Invoice | null>(null);
+  const [customerName, setCustomerName] = useState('');
+  const [debouncedName, setDebouncedName] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedName(customerName), 300);
+    return () => clearTimeout(timer);
+  }, [customerName]);
 
   const { data: invoices, isLoading } = useInvoices({
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
     paymentMethod: paymentMethod || undefined,
+    customerName: debouncedName || undefined,
   });
   const markWhatsappSent = useMarkWhatsappSent();
 
@@ -96,6 +104,11 @@ export const InvoicePage: React.FC = () => {
             <MenuItem value="Online">Online</MenuItem>
           </Select>
         </FormControl>
+        <TextField
+          label="Customer Name" size="small" placeholder="Search by name..."
+          value={customerName} onChange={(e) => setCustomerName(e.target.value)}
+          sx={{ minWidth: 200 }}
+        />
       </Box>
 
       <Paper>

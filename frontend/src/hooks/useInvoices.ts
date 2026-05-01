@@ -7,6 +7,7 @@ export const useInvoices = (filters?: {
   fromDate?: string;
   toDate?: string;
   paymentMethod?: string;
+  customerName?: string;
 }) => useQuery({ queryKey: ['invoices', filters], queryFn: () => invoiceService.getInvoices(filters) });
 
 export const useInvoice = (id: string) =>
