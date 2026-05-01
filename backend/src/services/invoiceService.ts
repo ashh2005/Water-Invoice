@@ -138,6 +138,7 @@ export const getInvoices = async (filters: {
   fromDate?: string;
   toDate?: string;
   paymentMethod?: string;
+  customerName?: string;
 }) => {
   const query: any = {};
   if (filters.customerId) query.customerId = filters.customerId;
@@ -146,6 +147,13 @@ export const getInvoices = async (filters: {
     query.createdAt = {};
     if (filters.fromDate) query.createdAt.$gte = new Date(filters.fromDate);
     if (filters.toDate) query.createdAt.$lte = new Date(filters.toDate + 'T23:59:59.999Z');
+  }
+  if (filters.customerName) {
+    const matchingCustomers = await Customer.find(
+      { nameEnglish: { $regex: filters.customerName, $options: 'i' } },
+      '_id'
+    );
+    query.customerId = { $in: matchingCustomers.map((c: any) => c._id) };
   }
 
   return Invoice.find(query)

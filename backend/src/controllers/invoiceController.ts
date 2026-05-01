@@ -6,12 +6,13 @@ import { Invoice } from '../models/Invoice';
 import { AuthRequest } from '../middleware/auth';
 
 export const getAll = asyncHandler(async (req: Request, res: Response) => {
-  const { customerId, fromDate, toDate, paymentMethod } = req.query;
+  const { customerId, fromDate, toDate, paymentMethod, customerName } = req.query;
   const invoices = await invoiceService.getInvoices({
     customerId: customerId as string,
     fromDate: fromDate as string,
     toDate: toDate as string,
     paymentMethod: paymentMethod as string,
+    customerName: customerName as string,
   });
   sendSuccess(res, invoices);
 });
