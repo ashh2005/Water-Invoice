@@ -59,7 +59,7 @@ export const HeroStatusCard: React.FC<HeroStatusCardProps> = ({ billing, onPayNo
         Pending Balance
       </Typography>
       <Typography variant="h3" fontWeight={800} lineHeight={1.1} mt={0.5}>
-        ₹{billing.pendingAmount.toLocaleString()}
+        ₹{(billing.pendingAmount ?? 0).toLocaleString()}
       </Typography>
       <Typography variant="body2" sx={{ opacity: 0.75, mt: 0.5, mb: 2 }}>
         {billing.pendingMonths} month{billing.pendingMonths > 1 ? 's' : ''} · Since {formatMonth(fromMonth)}
@@ -70,7 +70,7 @@ export const HeroStatusCard: React.FC<HeroStatusCardProps> = ({ billing, onPayNo
       <Box sx={{ bgcolor: 'rgba(255,255,255,0.12)', borderRadius: 2, p: 1.5, mb: 1.5 }}>
         <Typography variant="caption" sx={{ opacity: 0.75 }}>Paying for</Typography>
         <Typography variant="body1" fontWeight={700}>{formatMonthRange(fromMonth, toMonth)}</Typography>
-        <Typography variant="h6" fontWeight={800}>₹{billing.pendingAmount.toLocaleString()}</Typography>
+        <Typography variant="h6" fontWeight={800}>₹{(billing.pendingAmount ?? 0).toLocaleString()}</Typography>
       </Box>
 
       <Button

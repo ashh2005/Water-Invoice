@@ -17,7 +17,7 @@ export function usePWAInstall() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+  const isStandalone = typeof window !== 'undefined' && !!window.matchMedia?.('(display-mode: standalone)').matches;
   const canInstall = !!deferredPrompt && !isStandalone;
 
   const prompt = async () => {

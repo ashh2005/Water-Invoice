@@ -1,4 +1,4 @@
-import { Box, AppBar, Toolbar, Typography, IconButton, Skeleton } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Skeleton, Alert, Button } from '@mui/material';
 import { Logout } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
@@ -10,7 +10,7 @@ import { InstallBanner } from '../../components/common/InstallBanner';
 export const CustomerDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { customer, logout } = useCustomerAuth();
-  const { data: dashboard, isLoading } = useCustomerDashboard();
+  const { data: dashboard, isLoading, isError, refetch } = useCustomerDashboard();
   const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices();
   const payMutation = useInitiatePayment();
 
@@ -19,7 +19,11 @@ export const CustomerDashboardPage: React.FC = () => {
   const handlePayNow = async () => {
     if (!dashboard?.billing.pendingFrom) return;
     const toMonth = new Date().toISOString().slice(0, 7);
-    await payMutation.mutateAsync({ fromMonth: dashboard.billing.pendingFrom, toMonth });
+    try {
+      await payMutation.mutateAsync({ fromMonth: dashboard.billing.pendingFrom, toMonth });
+    } catch {
+      // onError in useInitiatePayment already shows a toast; swallow to prevent uncaught rejection
+    }
   };
 
   const guntaName = (dashboard?.customer.gunta as any)?.name ?? '';
@@ -60,6 +64,13 @@ export const CustomerDashboardPage: React.FC = () => {
             <Skeleton variant="text" width={120} height={16} animation="wave" sx={{ mb: 1 }} />
             <Skeleton variant="rounded" height={120} animation="wave" sx={{ borderRadius: 2.5 }} />
           </>
+        ) : isError ? (
+          <Alert
+            severity="error"
+            action={<Button size="small" onClick={() => refetch()}>Retry</Button>}
+          >
+            Could not load your account. Please check your connection.
+          </Alert>
         ) : dashboard ? (
           <>
             <HeroStatusCard

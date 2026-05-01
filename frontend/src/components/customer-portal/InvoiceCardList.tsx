@@ -44,7 +44,7 @@ export const InvoiceCardList: React.FC<InvoiceCardListProps> = ({ invoices, isLo
             </Box>
             <Box sx={{ textAlign: 'right' }}>
               <Typography variant="body2" fontWeight={700} color="success.main">
-                ₹{inv.amountPaid.toLocaleString()}
+                ₹{(inv.amountPaid ?? 0).toLocaleString()}
               </Typography>
               <Chip
                 label={inv.paymentMethod}

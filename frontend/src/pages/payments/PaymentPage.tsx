@@ -79,6 +79,7 @@ export const PaymentPage: React.FC = () => {
     for (const inv of customerInvoices) {
       const [fy, fm] = inv.paidFromMonth.split('-').map(Number);
       const [ty, tm] = inv.paidToMonth.split('-').map(Number);
+      if (fy > ty || (fy === ty && fm > tm)) continue;
       let y = fy, m = fm;
       while (y < ty || (y === ty && m <= tm)) {
         set.add(`${y}-${String(m).padStart(2, '0')}`);
@@ -93,7 +94,8 @@ export const PaymentPage: React.FC = () => {
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     if (!selectedCustomer || paidMonths.size === 0) return currentMonth;
     const sorted = Array.from(paidMonths).sort();
-    const [sy, sm] = sorted[0].split('-').map(Number);
+    const startKey = sorted[0] <= currentMonth ? sorted[0] : currentMonth;
+    const [sy, sm] = startKey.split('-').map(Number);
     let y = sy, m = sm;
     while (`${y}-${String(m).padStart(2, '0')}` <= currentMonth) {
       const key = `${y}-${String(m).padStart(2, '0')}`;
@@ -309,10 +311,10 @@ export const PaymentPage: React.FC = () => {
             </Box>
           </Box>
 
-          {result.razorpayOrder && (
+          {result.razorpayOrder && import.meta.env.VITE_UPI_VPA && (
             <Box sx={{ textAlign: 'center', mb: 2 }}>
               <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>Scan QR to pay:</Typography>
-              <QRCodeSVG value={`upi://pay?pa=&pn=WaterCollection&am=${result.invoice.amountPaid}&tn=${result.invoice.invoiceNumber}`} size={160} />
+              <QRCodeSVG value={`upi://pay?pa=${import.meta.env.VITE_UPI_VPA}&pn=WaterCollection&am=${result.invoice.amountPaid}&tn=${result.invoice.invoiceNumber}`} size={160} />
             </Box>
           )}
 
