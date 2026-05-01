@@ -5,6 +5,12 @@ export interface User {
   role: 'admin' | 'staff';
 }
 
+export interface StaffUser {
+  _id: string;
+  username: string;
+  role: 'admin' | 'staff';
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
@@ -14,6 +20,7 @@ export interface Gunta {
   _id: string;
   name: string;
   description?: string;
+  assignedStaff?: StaffUser | null;
   createdAt: string;
   updatedAt: string;
 }

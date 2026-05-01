@@ -12,12 +12,19 @@ export const getGuntaById = async (id: string): Promise<Gunta> => {
   return data.data;
 };
 
-export const createGunta = async (guntaData: { name: string; description?: string }): Promise<Gunta> => {
+export const createGunta = async (guntaData: {
+  name: string;
+  description?: string;
+  assignedStaff?: string | null;
+}): Promise<Gunta> => {
   const { data } = await api.post<ApiResponse<Gunta>>('/guntas', guntaData);
   return data.data;
 };
 
-export const updateGunta = async (id: string, guntaData: { name?: string; description?: string }): Promise<Gunta> => {
+export const updateGunta = async (
+  id: string,
+  guntaData: { name?: string; description?: string; assignedStaff?: string | null }
+): Promise<Gunta> => {
   const { data } = await api.put<ApiResponse<Gunta>>(`/guntas/${id}`, guntaData);
   return data.data;
 };
