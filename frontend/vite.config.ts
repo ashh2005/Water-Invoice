@@ -22,6 +22,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        navigateFallback: '/offline.html',
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
