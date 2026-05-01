@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import * as reportService from '../services/reportService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/apiResponse';
+import { AppError } from '../utils/AppError';
 
 export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
   const summary = await reportService.getDashboardSummary();
@@ -36,7 +37,13 @@ function getCurrentMonth(): string {
 export const getGuntaDetail = asyncHandler(async (req: Request, res: Response) => {
   const { guntaId, fromMonth, toMonth } = req.query;
   if (!guntaId || !fromMonth || !toMonth) {
-    return sendSuccess(res, null, 'guntaId, fromMonth, and toMonth query params are required');
+    throw new AppError('guntaId, fromMonth, and toMonth query params are required', 400);
+  }
+  if (!/^\d{4}-\d{2}$/.test(fromMonth as string) || !/^\d{4}-\d{2}$/.test(toMonth as string)) {
+    throw new AppError('fromMonth and toMonth must be in YYYY-MM format', 400);
+  }
+  if ((fromMonth as string) > (toMonth as string)) {
+    throw new AppError('fromMonth must be before or equal to toMonth', 400);
   }
   const data = await reportService.getGuntaDetail(
     guntaId as string,
