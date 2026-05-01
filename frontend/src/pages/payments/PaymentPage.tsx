@@ -1,33 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
-  Box, Stepper, Step, StepLabel, Paper, Typography, TextField,
-  Autocomplete, Button, ToggleButtonGroup, ToggleButton, Card,
-  CardContent, Grid, Divider, CircularProgress, Alert, Chip,
+  Box, TextField, Button, ToggleButtonGroup, ToggleButton,
+  Typography, Divider, CircularProgress, Alert, Chip,
 } from '@mui/material';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { useCustomers } from '../../hooks/useCustomers';
 import { useRecordCashPayment, useCreateOnlinePayment } from '../../hooks/usePayments';
 import { useInvoices, useMarkWhatsappSent } from '../../hooks/useInvoices';
-import { Customer, Gunta, Invoice } from '../../types';
+import { Customer, Invoice } from '../../types';
 import { QRCodeSVG } from 'qrcode.react';
-import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import { PageHeader } from '../../components/common/PageHeader';
-
-const steps = ['Search Customer', 'Select Period', 'Payment', 'Result'];
-
-const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatMonthRange(from: string, to: string): string {
-  const months: string[] = [];
-  const [fy, fm] = from.split('-').map(Number);
-  const [ty, tm] = to.split('-').map(Number);
-  let y = fy, m = fm;
-  while (y < ty || (y === ty && m <= tm)) {
-    months.push(`${monthNames[m - 1]} ${y}`);
-    m++;
-    if (m > 12) { m = 1; y++; }
-  }
-  return months.join(', ');
-}
+import { PaymentProgress } from '../../components/staff/PaymentProgress';
+import { CustomerPill } from '../../components/staff/CustomerPill';
+import { CustomerSearchList } from '../../components/staff/CustomerSearchList';
+import { formatMonth, formatMonthRange } from '../../utils/formatMonth';
 
 function monthDiff(from: string, to: string): number {
   const [fy, fm] = from.split('-').map(Number);
@@ -35,14 +20,46 @@ function monthDiff(from: string, to: string): number {
   return (ty - fy) * 12 + (tm - fm) + 1;
 }
 
+const ActionBar: React.FC<{
+  onBack?: () => void;
+  onNext: () => void;
+  nextLabel: string;
+  nextDisabled?: boolean;
+  nextLoading?: boolean;
+  nextColor?: 'primary' | 'success';
+}> = ({ onBack, onNext, nextLabel, nextDisabled, nextLoading, nextColor = 'primary' }) => (
+  <Box sx={{ display: 'flex', borderTop: '1px solid', borderColor: 'divider', mt: 'auto' }}>
+    {onBack && (
+      <Button
+        onClick={onBack}
+        sx={{ flex: 1, borderRadius: 0, py: 1.5, color: 'text.secondary', borderRight: '1px solid', borderColor: 'divider' }}
+        aria-label="Go back to previous step"
+      >
+        ← Back
+      </Button>
+    )}
+    <Button
+      variant="contained"
+      color={nextColor}
+      onClick={onNext}
+      disabled={nextDisabled || nextLoading}
+      sx={{ flex: 2, borderRadius: 0, py: 1.5, fontWeight: 700 }}
+    >
+      {nextLoading ? <CircularProgress size={20} color="inherit" /> : nextLabel}
+    </Button>
+  </Box>
+);
+
 export const PaymentPage: React.FC = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [search, setSearch] = useState('');
   const [fromMonth, setFromMonth] = useState('');
   const [toMonth, setToMonth] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online'>('Cash');
   const [result, setResult] = useState<{ invoice: Invoice; razorpayOrder?: any; razorpayKeyId?: string } | null>(null);
   const [error, setError] = useState('');
+  const stepTopRef = useRef<HTMLDivElement>(null);
 
   const { data: customers, isLoading: customersLoading } = useCustomers({ status: 'Rented' });
   const cashMutation = useRecordCashPayment();
@@ -52,9 +69,10 @@ export const PaymentPage: React.FC = () => {
     selectedCustomer ? { customerId: selectedCustomer._id } : undefined
   );
 
-  const gunta = selectedCustomer?.guntaId as Gunta | undefined;
+  useEffect(() => {
+    stepTopRef.current?.focus();
+  }, [activeStep]);
 
-  // Build set of already-paid months from existing invoices
   const paidMonths = useMemo(() => {
     const set = new Set<string>();
     if (!customerInvoices) return set;
@@ -64,36 +82,27 @@ export const PaymentPage: React.FC = () => {
       let y = fy, m = fm;
       while (y < ty || (y === ty && m <= tm)) {
         set.add(`${y}-${String(m).padStart(2, '0')}`);
-        m++;
-        if (m > 12) { m = 1; y++; }
+        m++; if (m > 12) { m = 1; y++; }
       }
     }
     return set;
   }, [customerInvoices]);
 
-  // Find the next unpaid month (starting from the earliest gap or after last paid)
-  // Returns null if customer is fully paid up through current month
   const nextUnpaidMonth = useMemo((): string | null => {
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    if (!selectedCustomer || paidMonths.size === 0) {
-      return currentMonth;
-    }
-    // Start from the earliest paid month and scan forward to find the first gap
+    if (!selectedCustomer || paidMonths.size === 0) return currentMonth;
     const sorted = Array.from(paidMonths).sort();
     const [sy, sm] = sorted[0].split('-').map(Number);
     let y = sy, m = sm;
     while (`${y}-${String(m).padStart(2, '0')}` <= currentMonth) {
       const key = `${y}-${String(m).padStart(2, '0')}`;
       if (!paidMonths.has(key)) return key;
-      m++;
-      if (m > 12) { m = 1; y++; }
+      m++; if (m > 12) { m = 1; y++; }
     }
-    // All months up to current are paid — no payment needed
     return null;
   }, [selectedCustomer, paidMonths]);
 
-  // Check if selected range overlaps with already-paid months
   const overlapWarning = useMemo(() => {
     if (!fromMonth || !toMonth || paidMonths.size === 0) return '';
     const overlapping: string[] = [];
@@ -102,12 +111,10 @@ export const PaymentPage: React.FC = () => {
     let y = fy, m = fm;
     while (y < ty || (y === ty && m <= tm)) {
       const key = `${y}-${String(m).padStart(2, '0')}`;
-      if (paidMonths.has(key)) overlapping.push(key);
-      m++;
-      if (m > 12) { m = 1; y++; }
+      if (paidMonths.has(key)) overlapping.push(formatMonth(key));
+      m++; if (m > 12) { m = 1; y++; }
     }
-    if (overlapping.length === 0) return '';
-    return `Already paid: ${overlapping.join(', ')}`;
+    return overlapping.length ? `Already paid: ${overlapping.join(', ')}` : '';
   }, [fromMonth, toMonth, paidMonths]);
 
   const months = useMemo(() => {
@@ -115,260 +122,223 @@ export const PaymentPage: React.FC = () => {
     return Math.max(monthDiff(fromMonth, toMonth), 0);
   }, [fromMonth, toMonth]);
 
-  const amount = useMemo(() => {
-    return months * (selectedCustomer?.monthlyCharge || 0);
-  }, [months, selectedCustomer]);
+  const amount = useMemo(() => months * (selectedCustomer?.monthlyCharge || 0), [months, selectedCustomer]);
 
   const handleSubmit = async () => {
     setError('');
     if (!selectedCustomer || !fromMonth || !toMonth || amount <= 0) return;
-
     try {
       if (paymentMethod === 'Cash') {
-        const res = await cashMutation.mutateAsync({
-          customerId: selectedCustomer._id,
-          fromMonth,
-          toMonth,
-          amount,
-        });
+        const res = await cashMutation.mutateAsync({ customerId: selectedCustomer._id, fromMonth, toMonth, amount });
         setResult({ invoice: res.invoice });
       } else {
-        const res = await onlineMutation.mutateAsync({
-          customerId: selectedCustomer._id,
-          fromMonth,
-          toMonth,
-          amount,
-        });
-        setResult({
-          invoice: res.invoice,
-          razorpayOrder: res.razorpayOrder,
-          razorpayKeyId: res.razorpayKeyId,
-        });
+        const res = await onlineMutation.mutateAsync({ customerId: selectedCustomer._id, fromMonth, toMonth, amount });
+        setResult({ invoice: res.invoice, razorpayOrder: res.razorpayOrder, razorpayKeyId: res.razorpayKeyId });
       }
       setActiveStep(3);
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || 'Payment failed');
+      setError(err.response?.data?.error?.message || 'Payment failed. Please try again.');
     }
   };
 
   const handleReset = () => {
-    setActiveStep(0);
-    setSelectedCustomer(null);
-    setFromMonth('');
-    setToMonth('');
-    setPaymentMethod('Cash');
-    setResult(null);
-    setError('');
+    setActiveStep(0); setSelectedCustomer(null); setSearch('');
+    setFromMonth(''); setToMonth(''); setPaymentMethod('Cash');
+    setResult(null); setError('');
   };
 
+  const filteredCustomers = useMemo(() => {
+    if (!customers) return [];
+    if (!search.trim()) return customers;
+    const q = search.toLowerCase();
+    return customers.filter(c =>
+      c.nameEnglish.toLowerCase().includes(q) ||
+      c.roomNumber.toLowerCase().includes(q) ||
+      c.mobile.includes(q)
+    );
+  }, [customers, search]);
+
   return (
-    <Box>
-      <PageHeader title="Record Payment" subtitle="Process water collection payments" />
+    <Box
+      sx={{ display: 'flex', flexDirection: 'column', flex: 1, maxWidth: 480, mx: 'auto', width: '100%', outline: 'none' }}
+      ref={stepTopRef}
+      tabIndex={-1}
+    >
+      <PaymentProgress step={activeStep} />
 
-      <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
-        {steps.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
-      </Stepper>
+      {selectedCustomer && activeStep > 0 && (
+        <CustomerPill customer={selectedCustomer} />
+      )}
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+      {activeStep === 0 && (
+        <>
+          <CustomerSearchList
+            customers={filteredCustomers}
+            isLoading={customersLoading}
+            search={search}
+            onSearchChange={setSearch}
+            onSelect={(c) => setSelectedCustomer(c)}
+          />
+          {selectedCustomer && nextUnpaidMonth === null && (
+            <Alert severity="success" sx={{ mx: 2, mb: 1 }}>
+              This customer is fully paid up through the current month.
+            </Alert>
+          )}
+          <ActionBar
+            onNext={() => {
+              if (!fromMonth && nextUnpaidMonth) { setFromMonth(nextUnpaidMonth); setToMonth(nextUnpaidMonth); }
+              setActiveStep(1);
+            }}
+            nextLabel="Next: Select Period →"
+            nextDisabled={!selectedCustomer || nextUnpaidMonth === null}
+          />
+        </>
+      )}
 
-      <Paper sx={{ p: 3 }}>
-        {activeStep === 0 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>Select Customer</Typography>
-            <Autocomplete
-              options={customers || []}
-              loading={customersLoading}
-              getOptionLabel={(customer) =>
-                `${customer.roomNumber} - ${customer.nameEnglish} (${typeof customer.guntaId === 'object' ? (customer.guntaId as Gunta).name : ''})`
-              }
-              value={selectedCustomer}
-              onChange={(_, value) => { setSelectedCustomer(value); setFromMonth(''); setToMonth(''); }}
-              renderInput={(params) => <TextField {...params} label="Search by room number or customer name" />}
+      {activeStep === 1 && (
+        <>
+          <Box sx={{ p: 2, flex: 1 }}>
+            <TextField
+              fullWidth label="From month (auto-set)" type="month"
+              value={fromMonth} InputProps={{ readOnly: true }}
+              InputLabelProps={{ shrink: true }}
+              helperText="Earliest unpaid month — cannot be changed"
               sx={{ mb: 2 }}
             />
-            {selectedCustomer && (
-              <Card variant="outlined" sx={{ mt: 2 }}>
-                <CardContent>
-                  <Grid container spacing={2}>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Room</Typography>
-                      <Typography fontWeight={500}>{selectedCustomer.roomNumber}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Gunta</Typography>
-                      <Typography>{gunta?.name || '-'}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Customer</Typography>
-                      <Typography fontWeight={500}>{selectedCustomer.nameEnglish}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Mobile</Typography>
-                      <Typography>{selectedCustomer.mobile}</Typography>
-                    </Grid>
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Monthly Charge</Typography>
-                      <Typography fontWeight={600} color="primary">Rs. {selectedCustomer.monthlyCharge}</Typography>
-                    </Grid>
-                  </Grid>
-                </CardContent>
-              </Card>
-            )}
-            {selectedCustomer && nextUnpaidMonth === null && (
-              <Alert severity="success" sx={{ mt: 2 }}>This customer is fully paid up through the current month. No payment needed.</Alert>
-            )}
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'flex-end' }}>
-              <Button variant="contained" disabled={!selectedCustomer || nextUnpaidMonth === null} onClick={() => {
-                if (!fromMonth && nextUnpaidMonth) {
-                  setFromMonth(nextUnpaidMonth);
-                  setToMonth(nextUnpaidMonth);
-                }
-                setActiveStep(1);
-              }}>
-                Next
-              </Button>
-            </Box>
-          </Box>
-        )}
-
-        {activeStep === 1 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>Select Billing Period</Typography>
-            <Grid container spacing={2} sx={{ mb: 2 }}>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth label="From Month" type="month" InputLabelProps={{ shrink: true }}
-                  value={fromMonth}
-                  InputProps={{ readOnly: true }}
-                  helperText="Auto-set to earliest unpaid month"
-                />
-              </Grid>
-              <Grid item xs={6}>
-                <TextField
-                  fullWidth label="To Month" type="month" InputLabelProps={{ shrink: true }}
-                  value={toMonth} onChange={(e) => setToMonth(e.target.value)}
-                  inputProps={{ min: fromMonth, max: new Date().toISOString().slice(0, 7) }}
-                />
-              </Grid>
-            </Grid>
-            {overlapWarning && (
-              <Alert severity="error" sx={{ mb: 2 }}>{overlapWarning}. Please select a different period.</Alert>
-            )}
+            <TextField
+              fullWidth label="To month" type="month"
+              value={toMonth} onChange={(e) => setToMonth(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              inputProps={{ min: fromMonth, max: new Date().toISOString().slice(0, 7) }}
+              sx={{ mb: 2 }}
+            />
+            {overlapWarning && <Alert severity="error" sx={{ mb: 2 }}>{overlapWarning}</Alert>}
             {months > 0 && !overlapWarning && (
-              <Card variant="outlined">
-                <CardContent>
-                  <Typography variant="body2" color="text.secondary">Summary</Typography>
-                  <Typography>Months: <strong>{months}</strong></Typography>
-                  <Typography>Rate: Rs. {selectedCustomer?.monthlyCharge}/month</Typography>
-                  <Divider sx={{ my: 1 }} />
-                  <Typography variant="h6" color="primary">Total: Rs. {amount}</Typography>
-                </CardContent>
-              </Card>
+              <Box sx={{ bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 2, p: 2 }}>
+                <Typography variant="caption" color="text.secondary">Summary</Typography>
+                <Typography variant="body2">{months} month{months > 1 ? 's' : ''} × ₹{selectedCustomer?.monthlyCharge}</Typography>
+                <Divider sx={{ my: 1 }} />
+                <Typography variant="h6" color="primary.dark" fontWeight={800}>Total: ₹{amount}</Typography>
+              </Box>
             )}
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-              <Button onClick={() => setActiveStep(0)}>Back</Button>
-              <Button variant="contained" disabled={months < 1 || !!overlapWarning} onClick={() => setActiveStep(2)}>Next</Button>
-            </Box>
           </Box>
-        )}
+          <ActionBar
+            onBack={() => setActiveStep(0)}
+            onNext={() => setActiveStep(2)}
+            nextLabel="Next: Confirm →"
+            nextDisabled={months < 1 || !!overlapWarning}
+          />
+        </>
+      )}
 
-        {activeStep === 2 && (
-          <Box>
-            <Typography variant="h6" gutterBottom>Payment Method</Typography>
+      {activeStep === 2 && (
+        <>
+          <Box sx={{ p: 2, flex: 1 }}>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} sx={{ textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Payment Method
+            </Typography>
             <ToggleButtonGroup
-              value={paymentMethod}
-              exclusive
+              value={paymentMethod} exclusive
               onChange={(_, val) => val && setPaymentMethod(val)}
-              sx={{ mb: 3 }}
+              fullWidth sx={{ mt: 1, mb: 2, '& .MuiToggleButton-root': { py: 1.5, fontWeight: 600 } }}
+              aria-label="Select payment method"
             >
-              <ToggleButton value="Cash">Cash</ToggleButton>
-              <ToggleButton value="Online">Online (Razorpay)</ToggleButton>
+              <ToggleButton value="Cash" aria-label="Cash payment">💵 Cash</ToggleButton>
+              <ToggleButton value="Online" aria-label="Online payment via Razorpay">📱 Online (Razorpay)</ToggleButton>
             </ToggleButtonGroup>
 
-            <Card variant="outlined">
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Payment Summary</Typography>
-                <Grid container spacing={1}>
-                  <Grid item xs={6}><Typography color="text.secondary">Room:</Typography></Grid>
-                  <Grid item xs={6}><Typography>{selectedCustomer?.roomNumber}</Typography></Grid>
-                  <Grid item xs={6}><Typography color="text.secondary">Customer:</Typography></Grid>
-                  <Grid item xs={6}><Typography>{selectedCustomer?.nameEnglish}</Typography></Grid>
-                  <Grid item xs={6}><Typography color="text.secondary">Period:</Typography></Grid>
-                  <Grid item xs={6}><Typography>{fromMonth} to {toMonth}</Typography></Grid>
-                  <Grid item xs={6}><Typography color="text.secondary">Months:</Typography></Grid>
-                  <Grid item xs={6}><Typography>{months}</Typography></Grid>
-                  <Grid item xs={6}><Typography color="text.secondary">Method:</Typography></Grid>
-                  <Grid item xs={6}><Chip label={paymentMethod} color={paymentMethod === 'Cash' ? 'success' : 'primary'} size="small" /></Grid>
-                </Grid>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h5" color="primary" fontWeight={600}>Amount: Rs. {amount}</Typography>
-              </CardContent>
-            </Card>
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden', mb: 2 }}>
+              {[
+                ['Period', formatMonthRange(fromMonth, toMonth)],
+                ['Months', String(months)],
+                ['Method', paymentMethod],
+              ].map(([label, value], i, arr) => (
+                <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 1.5, borderBottom: i < arr.length - 1 ? '1px solid' : 'none', borderColor: 'divider' }}>
+                  <Typography variant="body2" color="text.secondary">{label}</Typography>
+                  {label === 'Method'
+                    ? <Chip label={value} size="small" color={value === 'Cash' ? 'success' : 'primary'} />
+                    : <Typography variant="body2" fontWeight={600}>{value}</Typography>
+                  }
+                </Box>
+              ))}
+            </Box>
 
-            <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
-              <Button onClick={() => setActiveStep(1)}>Back</Button>
+            <Box sx={{ bgcolor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 2, p: 2, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Total Amount</Typography>
+              <Typography variant="h4" color="primary.dark" fontWeight={800}>₹{amount}</Typography>
+            </Box>
+
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+          </Box>
+          <ActionBar
+            onBack={() => setActiveStep(1)}
+            onNext={handleSubmit}
+            nextLabel="✓ Confirm Payment"
+            nextColor="success"
+            nextLoading={cashMutation.isPending || onlineMutation.isPending}
+          />
+        </>
+      )}
+
+      {activeStep === 3 && result && (
+        <Box sx={{ p: 2, flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box
+            sx={{ border: '2px solid', borderColor: 'success.light', bgcolor: '#f0fdf4', borderRadius: 2.5, overflow: 'hidden', mb: 2 }}
+            role="status"
+            aria-label="Payment recorded successfully"
+            tabIndex={-1}
+            ref={(el: HTMLDivElement | null) => el?.focus()}
+          >
+            <Box sx={{ bgcolor: 'success.main', color: '#fff', p: 1.5, textAlign: 'center' }}>
+              <Typography variant="subtitle1" fontWeight={700}>✓ Payment Recorded</Typography>
+            </Box>
+            {[
+              ['Invoice', result.invoice.invoiceNumber],
+              ['Customer', `${selectedCustomer?.nameEnglish} · Room ${selectedCustomer?.roomNumber}`],
+              ['Period', formatMonthRange(result.invoice.paidFromMonth, result.invoice.paidToMonth)],
+              ['Method', result.invoice.paymentMethod],
+            ].map(([label, value], i, arr) => (
+              <Box key={label} sx={{ display: 'flex', justifyContent: 'space-between', p: 1.5, borderBottom: i < arr.length - 1 ? '1px solid' : 'none', borderColor: 'success.light' }}>
+                <Typography variant="body2" color="text.secondary">{label}</Typography>
+                <Typography variant="body2" fontWeight={600}>{value}</Typography>
+              </Box>
+            ))}
+            <Box sx={{ p: 2, textAlign: 'center' }}>
+              <Typography variant="caption" color="text.secondary">Amount Collected</Typography>
+              <Typography variant="h4" color="success.main" fontWeight={800}>₹{result.invoice.amountPaid}</Typography>
+            </Box>
+          </Box>
+
+          {result.razorpayOrder && (
+            <Box sx={{ textAlign: 'center', mb: 2 }}>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>Scan QR to pay:</Typography>
+              <QRCodeSVG value={`upi://pay?pa=&pn=WaterCollection&am=${result.invoice.amountPaid}&tn=${result.invoice.invoiceNumber}`} size={160} />
+            </Box>
+          )}
+
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mt: 'auto' }}>
+            {selectedCustomer?.mobile && (
               <Button
-                variant="contained"
-                color="success"
-                onClick={handleSubmit}
-                disabled={cashMutation.isPending || onlineMutation.isPending}
+                fullWidth variant="contained"
+                sx={{ bgcolor: '#25D366', '&:hover': { bgcolor: '#1ebe57' }, py: 1.5, fontWeight: 700, fontSize: 15 }}
+                startIcon={<WhatsAppIcon />}
+                onClick={() => {
+                  const msg = `Your payment for ${formatMonthRange(result.invoice.paidFromMonth, result.invoice.paidToMonth)} has been received. Amount: ₹${result.invoice.amountPaid}. Invoice: ${result.invoice.invoiceNumber}.`;
+                  const phone = selectedCustomer.mobile.startsWith('+') ? selectedCustomer.mobile.slice(1) : `91${selectedCustomer.mobile}`;
+                  window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                  markWhatsappSent.mutate(result.invoice._id);
+                }}
+                aria-label="Send WhatsApp receipt to customer"
               >
-                {(cashMutation.isPending || onlineMutation.isPending) ? <CircularProgress size={24} /> : 'Confirm Payment'}
+                Send WhatsApp Receipt
               </Button>
-            </Box>
+            )}
+            <Button fullWidth variant="outlined" onClick={handleReset} sx={{ py: 1.5 }}>
+              + New Payment
+            </Button>
           </Box>
-        )}
-
-        {activeStep === 3 && result && (
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography variant="h5" color="success.main" gutterBottom>Payment Recorded!</Typography>
-            <Card variant="outlined" sx={{ maxWidth: 500, mx: 'auto', mt: 2 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>Invoice #{result.invoice.invoiceNumber}</Typography>
-                <Typography>Room: {selectedCustomer?.roomNumber}</Typography>
-                <Typography>Customer: {selectedCustomer?.nameEnglish}</Typography>
-                <Typography>Period: {result.invoice.paidFromMonth} to {result.invoice.paidToMonth}</Typography>
-                <Typography>Amount: Rs. {result.invoice.amountPaid}</Typography>
-                <Typography>Method: {result.invoice.paymentMethod}</Typography>
-                <Divider sx={{ my: 1 }} />
-                <Typography variant="body2" color="text.secondary">
-                  WhatsApp: {result.invoice.whatsappSent ? 'Sent' : 'Not yet sent'}
-                </Typography>
-
-                {result.razorpayOrder && (
-                  <Box sx={{ mt: 2 }}>
-                    <Typography variant="body2" gutterBottom>Scan QR to pay:</Typography>
-                    <QRCodeSVG
-                      value={`upi://pay?pa=&pn=WaterCollection&am=${result.invoice.amountPaid}&tn=${result.invoice.invoiceNumber}`}
-                      size={200}
-                    />
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
-            <Box sx={{ mt: 3, display: 'flex', gap: 2, justifyContent: 'center' }}>
-              <Button variant="contained" onClick={handleReset}>New Payment</Button>
-              {selectedCustomer?.mobile && (
-                <Button
-                  variant="contained"
-                  color="success"
-                  startIcon={<WhatsAppIcon />}
-                  onClick={() => {
-                    const monthsText = formatMonthRange(result.invoice.paidFromMonth, result.invoice.paidToMonth);
-                    const message = `Your payment for month(s) ${monthsText} has been received for amount Rs. ${result.invoice.amountPaid}`;
-                    const phone = selectedCustomer.mobile.startsWith('+') ? selectedCustomer.mobile.slice(1) : `91${selectedCustomer.mobile}`;
-                    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
-                    markWhatsappSent.mutate(result.invoice._id);
-                    setResult({ ...result, invoice: { ...result.invoice, whatsappSent: true } });
-                  }}
-                >
-                  Send WhatsApp
-                </Button>
-              )}
-            </Box>
-          </Box>
-        )}
-      </Paper>
+        </Box>
+      )}
     </Box>
   );
 };
