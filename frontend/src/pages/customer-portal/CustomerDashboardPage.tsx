@@ -1,190 +1,74 @@
-import React, { useState } from 'react';
-import {
-  Box, Card, CardContent, Typography, Button, Table,
-  TableHead, TableRow, TableCell, TableBody, CircularProgress,
-  Grid, Divider, Chip, Alert, TextField, Paper, AppBar, Toolbar,
-  IconButton,
-} from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, IconButton, Skeleton } from '@mui/material';
 import { Logout } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
 import { useCustomerDashboard, useCustomerInvoices, useInitiatePayment } from '../../hooks/useCustomerPortal';
+import { HeroStatusCard } from '../../components/customer-portal/HeroStatusCard';
+import { InvoiceCardList } from '../../components/customer-portal/InvoiceCardList';
 
 export const CustomerDashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { customer, logout } = useCustomerAuth();
   const { data: dashboard, isLoading } = useCustomerDashboard();
-  const { data: invoices } = useCustomerInvoices();
+  const { data: invoices, isLoading: invoicesLoading } = useCustomerInvoices();
   const payMutation = useInitiatePayment();
 
-  const [showPayForm, setShowPayForm] = useState(false);
-  const [fromMonth, setFromMonth] = useState('');
-  const [toMonth, setToMonth] = useState('');
+  const handleLogout = () => { logout(); navigate('/login'); };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+  const handlePayNow = async () => {
+    if (!dashboard?.billing.pendingFrom) return;
+    const toMonth = new Date().toISOString().slice(0, 7);
+    await payMutation.mutateAsync({ fromMonth: dashboard.billing.pendingFrom, toMonth });
   };
 
-  const handlePay = async () => {
-    if (!fromMonth || !toMonth) return;
-    try {
-      await payMutation.mutateAsync({ fromMonth, toMonth });
-      setShowPayForm(false);
-      setFromMonth('');
-      setToMonth('');
-    } catch {
-      // Error handled by hook
-    }
-  };
-
-  if (isLoading) {
-    return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
-  }
+  const guntaName = (dashboard?.customer.gunta as any)?.name ?? '';
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Customer Portal
-          </Typography>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {customer?.nameEnglish}
-          </Typography>
-          <IconButton color="inherit" onClick={handleLogout}>
-            <Logout />
-          </IconButton>
+    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', flexDirection: 'column' }}>
+      <AppBar position="static" elevation={0} sx={{ bgcolor: 'primary.main' }}>
+        <Toolbar sx={{ flexDirection: 'column', alignItems: 'flex-start', py: 1, minHeight: 'auto' }}>
+          <Box sx={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ flexGrow: 1 }}>
+              {customer?.nameEnglish ?? 'Customer Portal'}
+            </Typography>
+            <IconButton
+              color="inherit" onClick={handleLogout}
+              aria-label="Logout" sx={{ p: '10px' }}
+            >
+              <Logout fontSize="small" />
+            </IconButton>
+          </Box>
+          {dashboard && (
+            <Typography variant="caption" sx={{ opacity: 0.8, mt: -0.5, mb: 0.5 }}>
+              Room {dashboard.customer.roomNumber} · {guntaName}
+            </Typography>
+          )}
+          <Box sx={{ width: '100%', bgcolor: 'rgba(255,255,255,0.15)', borderRadius: 2, px: 2, py: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+            <Typography variant="caption" sx={{ opacity: 0.85 }}>Monthly charge</Typography>
+            <Typography variant="subtitle1" fontWeight={800}>
+              {isLoading ? <Skeleton width={50} sx={{ bgcolor: 'rgba(255,255,255,0.3)' }} /> : `₹${dashboard?.customer.monthlyCharge ?? ''}`}
+            </Typography>
+          </Box>
         </Toolbar>
       </AppBar>
 
-      <Box sx={{ p: 3, maxWidth: 900, mx: 'auto' }}>
-        {dashboard && (
+      <Box sx={{ flex: 1, p: 2, maxWidth: 480, mx: 'auto', width: '100%' }}>
+        {isLoading ? (
           <>
-            <Grid container spacing={3} sx={{ mb: 3 }}>
-              <Grid item xs={12} sm={6}>
-                <Card>
-                  <CardContent>
-                    <Typography color="text.secondary">Room</Typography>
-                    <Typography variant="h5" fontWeight={600}>{dashboard.customer.roomNumber}</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Gunta: {(dashboard.customer.gunta as any)?.name || '-'}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Card>
-                  <CardContent>
-                    <Typography color="text.secondary">Monthly Charge</Typography>
-                    <Typography variant="h5" fontWeight={600} color="primary">
-                      Rs. {dashboard.customer.monthlyCharge}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </Grid>
-            </Grid>
-
-            {/* Pending Bill */}
-            <Card sx={{ mb: 3 }}>
-              <CardContent>
-                <Typography variant="h6" gutterBottom>
-                  {dashboard.billing.currentMonth} - Payment Status
-                </Typography>
-                {dashboard.billing.isPaid ? (
-                  <Alert severity="success">Your payment for this month is up to date!</Alert>
-                ) : (
-                  <Box>
-                    <Alert severity="warning" sx={{ mb: 2 }}>
-                      You have pending payments: {dashboard.billing.pendingMonths} month(s) - Rs. {dashboard.billing.pendingAmount}
-                    </Alert>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                      Pending from: {dashboard.billing.pendingFrom}
-                    </Typography>
-
-                    {!showPayForm ? (
-                      <Button variant="contained" color="primary" onClick={() => {
-                        if (dashboard.billing.pendingFrom) {
-                          setFromMonth(dashboard.billing.pendingFrom);
-                          setToMonth(dashboard.billing.pendingFrom);
-                        }
-                        setShowPayForm(true);
-                      }}>
-                        Pay Now
-                      </Button>
-                    ) : (
-                      <Box sx={{ mt: 2 }}>
-                        <Grid container spacing={2} sx={{ mb: 2 }}>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth label="From Month" type="month" size="small"
-                              InputLabelProps={{ shrink: true }}
-                              value={fromMonth}
-                              InputProps={{ readOnly: true }}
-                              helperText="Earliest unpaid month"
-                            />
-                          </Grid>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth label="To Month" type="month" size="small"
-                              InputLabelProps={{ shrink: true }}
-                              value={toMonth} onChange={(e) => setToMonth(e.target.value)}
-                              inputProps={{ min: fromMonth, max: new Date().toISOString().slice(0, 7) }}
-                            />
-                          </Grid>
-                        </Grid>
-                        <Box sx={{ display: 'flex', gap: 1 }}>
-                          <Button
-                            variant="contained"
-                            onClick={handlePay}
-                            disabled={payMutation.isPending || !fromMonth || !toMonth}
-                          >
-                            {payMutation.isPending ? <CircularProgress size={24} /> : 'Initiate Payment'}
-                          </Button>
-                          <Button variant="outlined" onClick={() => setShowPayForm(false)}>Cancel</Button>
-                        </Box>
-                      </Box>
-                    )}
-                  </Box>
-                )}
-              </CardContent>
-            </Card>
+            <Skeleton variant="rounded" height={200} animation="wave" sx={{ borderRadius: 3.5, mb: 2 }} />
+            <Skeleton variant="text" width={120} height={16} animation="wave" sx={{ mb: 1 }} />
+            <Skeleton variant="rounded" height={120} animation="wave" sx={{ borderRadius: 2.5 }} />
           </>
-        )}
-
-        {/* Invoice History */}
-        <Paper sx={{ p: 3 }}>
-          <Typography variant="h6" gutterBottom>Invoice History</Typography>
-          <Divider sx={{ mb: 2 }} />
-          {!invoices?.length ? (
-            <Typography color="text.secondary">No invoices found</Typography>
-          ) : (
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Invoice #</TableCell>
-                  <TableCell>Period</TableCell>
-                  <TableCell>Amount</TableCell>
-                  <TableCell>Method</TableCell>
-                  <TableCell>Date</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {invoices.map((inv) => (
-                  <TableRow key={inv._id}>
-                    <TableCell><Typography fontWeight={500}>{inv.invoiceNumber}</Typography></TableCell>
-                    <TableCell>{inv.paidFromMonth} to {inv.paidToMonth}</TableCell>
-                    <TableCell>Rs. {inv.amountPaid}</TableCell>
-                    <TableCell>
-                      <Chip label={inv.paymentMethod} size="small" color={inv.paymentMethod === 'Cash' ? 'success' : 'primary'} />
-                    </TableCell>
-                    <TableCell>{new Date(inv.createdAt).toLocaleDateString()}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </Paper>
+        ) : dashboard ? (
+          <>
+            <HeroStatusCard
+              billing={dashboard.billing}
+              onPayNow={handlePayNow}
+              isPaying={payMutation.isPending}
+            />
+            <InvoiceCardList invoices={invoices ?? []} isLoading={invoicesLoading} />
+          </>
+        ) : null}
       </Box>
     </Box>
   );
