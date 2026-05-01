@@ -16,3 +16,10 @@ export const useCollectionSummary = (fromDate: string, toDate: string) =>
     queryFn: () => reportService.getCollectionSummary(fromDate, toDate),
     enabled: !!fromDate && !!toDate,
   });
+
+export const useGuntaDetail = (guntaId: string, fromMonth: string, toMonth: string) =>
+  useQuery({
+    queryKey: ['gunta-detail', guntaId, fromMonth, toMonth],
+    queryFn: () => reportService.getGuntaDetail(guntaId, fromMonth, toMonth),
+    enabled: !!guntaId && !!fromMonth && !!toMonth,
+  });

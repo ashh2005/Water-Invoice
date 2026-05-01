@@ -10,5 +10,6 @@ router.get('/dashboard', reportController.getDashboard);
 router.get('/monthly-collection', reportController.getMonthlyCollection);
 router.get('/defaulters', reportController.getDefaulters);
 router.get('/collection-summary', reportController.getCollectionSummary);
+router.get('/gunta-detail', reportController.getGuntaDetail);
 
 export default router;

@@ -1,8 +1,9 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import mongoose, { Document, Schema, Types } from 'mongoose';
 
 export interface IGunta extends Document {
   name: string;
   description?: string;
+  assignedStaff?: Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -20,6 +21,11 @@ const guntaSchema = new Schema<IGunta>(
       type: String,
       trim: true,
       maxlength: 500,
+    },
+    assignedStaff: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
     },
   },
   { timestamps: true }

@@ -165,3 +165,60 @@ export const getCollectionSummary = async (fromDate: string, toDate: string) => 
     invoices,
   };
 };
+
+export const getGuntaDetail = async (guntaId: string, fromMonth: string, toMonth: string) => {
+  const customers = await Customer.find({ guntaId, status: 'Rented' });
+
+  const paid: any[] = [];
+  const unpaid: any[] = [];
+
+  for (const customer of customers) {
+    const invoice = await Invoice.findOne({
+      customerId: customer._id,
+      paidFromMonth: { $lte: toMonth },
+      paidToMonth: { $gte: fromMonth },
+    }).sort({ createdAt: -1 });
+
+    if (invoice) {
+      paid.push({
+        customer: {
+          _id: customer._id,
+          nameEnglish: customer.nameEnglish,
+          nameHindi: customer.nameHindi,
+          mobile: customer.mobile,
+          roomNumber: customer.roomNumber,
+          monthlyCharge: customer.monthlyCharge,
+        },
+        invoice: {
+          invoiceNumber: invoice.invoiceNumber,
+          amountPaid: invoice.amountPaid,
+          paymentMethod: invoice.paymentMethod,
+          paidFromMonth: invoice.paidFromMonth,
+          paidToMonth: invoice.paidToMonth,
+          createdAt: invoice.createdAt,
+        },
+      });
+    } else {
+      const [fy, fm] = fromMonth.split('-').map(Number);
+      const [ty, tm] = toMonth.split('-').map(Number);
+      const pendingMonths = (ty - fy) * 12 + (tm - fm) + 1;
+      unpaid.push({
+        customer: {
+          _id: customer._id,
+          nameEnglish: customer.nameEnglish,
+          nameHindi: customer.nameHindi,
+          mobile: customer.mobile,
+          roomNumber: customer.roomNumber,
+          monthlyCharge: customer.monthlyCharge,
+        },
+        pendingMonths,
+        pendingAmount: pendingMonths * customer.monthlyCharge,
+      });
+    }
+  }
+
+  const paidTotal = paid.reduce((sum, p) => sum + p.invoice.amountPaid, 0);
+  const unpaidTotal = unpaid.reduce((sum, u) => sum + u.pendingAmount, 0);
+
+  return { paid, unpaid, paidTotal, unpaidTotal };
+};

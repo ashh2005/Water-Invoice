@@ -14,6 +14,7 @@ import invoiceRoutes from './routes/invoiceRoutes';
 import reportRoutes from './routes/reportRoutes';
 import customerAuthRoutes from './routes/customerAuthRoutes';
 import customerPortalRoutes from './routes/customerPortalRoutes';
+import userRoutes from './routes/userRoutes';
 import { generalLimiter, authLimiter } from './middleware/rateLimiter';
 
 dotenv.config();
@@ -56,6 +57,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/customer-auth', customerAuthRoutes);
 app.use('/api/customer-portal', customerPortalRoutes);
+app.use('/api/users', userRoutes);
 
 // Error handling middleware
 app.use(notFound);

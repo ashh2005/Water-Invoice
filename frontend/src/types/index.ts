@@ -5,6 +5,12 @@ export interface User {
   role: 'admin' | 'staff';
 }
 
+export interface StaffUser {
+  _id: string;
+  username: string;
+  role: 'admin' | 'staff';
+}
+
 export interface AuthResponse {
   token: string;
   user: User;
@@ -14,6 +20,7 @@ export interface Gunta {
   _id: string;
   name: string;
   description?: string;
+  assignedStaff?: StaffUser | string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -131,6 +138,40 @@ export interface CustomerDashboard {
     currentMonth: string;
   };
   recentInvoices: Invoice[];
+}
+
+export interface GuntaDetailCustomer {
+  _id: string;
+  nameEnglish: string;
+  nameHindi?: string;
+  mobile: string;
+  roomNumber: string;
+  monthlyCharge: number;
+}
+
+export interface GuntaDetailPaidEntry {
+  customer: GuntaDetailCustomer;
+  invoice: {
+    invoiceNumber: string;
+    amountPaid: number;
+    paymentMethod: 'Cash' | 'Online';
+    paidFromMonth: string;
+    paidToMonth: string;
+    createdAt: string;
+  };
+}
+
+export interface GuntaDetailUnpaidEntry {
+  customer: GuntaDetailCustomer;
+  pendingMonths: number;
+  pendingAmount: number;
+}
+
+export interface GuntaDetailReport {
+  paid: GuntaDetailPaidEntry[];
+  unpaid: GuntaDetailUnpaidEntry[];
+  paidTotal: number;
+  unpaidTotal: number;
 }
 
 export interface ApiResponse<T> {

@@ -2,13 +2,16 @@ import { useState } from 'react';
 import {
   Box, Paper, Typography, Tabs, Tab, TextField, Button, Table,
   TableHead, TableRow, TableCell, TableBody, CircularProgress,
-  Card, CardContent, Grid, Chip,
+  Card, CardContent, Grid, Chip, FormControl, InputLabel, Select, MenuItem,
+  Tooltip as MuiTooltip, IconButton,
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PageHeader } from '../../components/common/PageHeader';
-import { useDefaulters, useCollectionSummary } from '../../hooks/useDashboard';
-import { Defaulter } from '../../types';
+import { useDefaulters, useCollectionSummary, useGuntaDetail } from '../../hooks/useDashboard';
+import { useGuntas } from '../../hooks/useGuntas';
+import { Defaulter, GuntaDetailPaidEntry, GuntaDetailUnpaidEntry } from '../../types';
 import jsPDF from 'jspdf';
 import * as XLSX from 'xlsx';
 
@@ -17,8 +20,41 @@ export const ReportsPage: React.FC = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const monthStart = selectedMonth ? `${selectedMonth}-01` : '';
+  const monthEnd = selectedMonth
+    ? (() => {
+        const [y, m] = selectedMonth.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        return `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+      })()
+    : '';
+
+  const [selectedGuntaId, setSelectedGuntaId] = useState('');
+  const [guntaFromMonth, setGuntaFromMonth] = useState('');
+  const [guntaToMonth, setGuntaToMonth] = useState('');
+  const [remindedCustomerIds, setRemindedCustomerIds] = useState<Set<string>>(new Set());
+
+  const handleSendReminder = (d: Defaulter) => {
+    const name = d.customer.nameEnglish;
+    const amount = d.pendingAmount;
+    const months = d.pendingMonths;
+    const since = d.pendingFrom;
+    const message = `Dear ${name}, your water bill of Rs.${amount} is pending for ${months} month(s) since ${since}. Please pay at the earliest. Thank you.`;
+    const phone = d.customer.mobile.startsWith('+') ? d.customer.mobile.slice(1) : `91${d.customer.mobile}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+    setRemindedCustomerIds((prev) => new Set(prev).add(d.customer._id));
+  };
+
   const { data: defaulters, isLoading: defaultersLoading } = useDefaulters();
   const { data: collectionData, isLoading: collectionLoading } = useCollectionSummary(fromDate, toDate);
+  const { data: monthlyData, isLoading: monthlyLoading } = useCollectionSummary(monthStart, monthEnd);
+  const { data: guntas } = useGuntas();
+  const { data: guntaDetail, isLoading: guntaDetailLoading } = useGuntaDetail(selectedGuntaId, guntaFromMonth, guntaToMonth);
 
   const exportDefaultersExcel = () => {
     if (!defaulters) return;
@@ -66,6 +102,59 @@ export const ReportsPage: React.FC = () => {
     doc.save('defaulters.pdf');
   };
 
+  const exportGuntaDetailExcel = () => {
+    if (!guntaDetail) return;
+    const paidRows = guntaDetail.paid.map((p: GuntaDetailPaidEntry) => ({
+      Status: 'Paid', Room: p.customer.roomNumber, Customer: p.customer.nameEnglish,
+      'Invoice #': p.invoice.invoiceNumber, Amount: p.invoice.amountPaid,
+      Method: p.invoice.paymentMethod, Period: `${p.invoice.paidFromMonth} to ${p.invoice.paidToMonth}`,
+      Date: new Date(p.invoice.createdAt).toLocaleDateString(),
+    }));
+    const unpaidRows = guntaDetail.unpaid.map((u: GuntaDetailUnpaidEntry) => ({
+      Status: 'Unpaid', Room: u.customer.roomNumber, Customer: u.customer.nameEnglish,
+      'Invoice #': '-', Amount: u.pendingAmount,
+      Method: '-', Period: `${guntaFromMonth} to ${guntaToMonth}`,
+      Date: '-',
+    }));
+    const ws = XLSX.utils.json_to_sheet([...paidRows, ...unpaidRows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Gunta Detail');
+    XLSX.writeFile(wb, `gunta-detail-${selectedGuntaId}-${guntaFromMonth}-${guntaToMonth}.xlsx`);
+  };
+
+  const exportGuntaDetailPDF = () => {
+    if (!guntaDetail) return;
+    const doc = new jsPDF();
+    const guntaName = guntas?.find((g) => g._id === selectedGuntaId)?.name || selectedGuntaId;
+    doc.setFontSize(16);
+    doc.text(`Gunta Detail: ${guntaName}`, 20, 20);
+    doc.setFontSize(11);
+    doc.text(`Period: ${guntaFromMonth} to ${guntaToMonth}`, 20, 30);
+    doc.text(`Paid Total: Rs. ${guntaDetail.paidTotal} | Unpaid Total: Rs. ${guntaDetail.unpaidTotal}`, 20, 40);
+
+    let y = 55;
+    doc.setFontSize(12);
+    doc.text('PAID', 20, y); y += 8;
+    doc.setFontSize(9);
+    guntaDetail.paid.forEach((p: GuntaDetailPaidEntry) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(`Room ${p.customer.roomNumber} - ${p.customer.nameEnglish} | Rs.${p.invoice.amountPaid} | ${p.invoice.paymentMethod} | ${p.invoice.invoiceNumber}`, 20, y);
+      y += 7;
+    });
+
+    y += 5;
+    doc.setFontSize(12);
+    doc.text('UNPAID', 20, y); y += 8;
+    doc.setFontSize(9);
+    guntaDetail.unpaid.forEach((u: GuntaDetailUnpaidEntry) => {
+      if (y > 270) { doc.addPage(); y = 20; }
+      doc.text(`Room ${u.customer.roomNumber} - ${u.customer.nameEnglish} | Pending: Rs.${u.pendingAmount} (${u.pendingMonths} months)`, 20, y);
+      y += 7;
+    });
+
+    doc.save(`gunta-detail-${guntaName}-${guntaFromMonth}.pdf`);
+  };
+
   return (
     <Box>
       <PageHeader title="Reports & Analytics" subtitle="View collection reports and defaulters" />
@@ -75,6 +164,8 @@ export const ReportsPage: React.FC = () => {
           <Tab label="Collection Summary" />
           <Tab label="Defaulters List" />
           <Tab label="Payment Breakdown" />
+          <Tab label="Monthly Summary" />
+          <Tab label="Gunta Detail" />
         </Tabs>
       </Paper>
 
@@ -172,6 +263,7 @@ export const ReportsPage: React.FC = () => {
                     <TableCell>Pending Months</TableCell>
                     <TableCell>Pending Amount</TableCell>
                     <TableCell>Last Payment</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -185,6 +277,17 @@ export const ReportsPage: React.FC = () => {
                       <TableCell><Chip label={d.pendingMonths} color="error" size="small" /></TableCell>
                       <TableCell><Typography color="error" fontWeight={600}>Rs. {d.pendingAmount}</Typography></TableCell>
                       <TableCell>{d.lastPaymentDate ? new Date(d.lastPaymentDate).toLocaleDateString() : 'Never'}</TableCell>
+                      <TableCell>
+                        <MuiTooltip title={remindedCustomerIds.has(d.customer._id) ? 'Reminder sent' : 'Send WhatsApp reminder'}>
+                          <IconButton
+                            size="small"
+                            color={remindedCustomerIds.has(d.customer._id) ? 'success' : 'default'}
+                            onClick={() => handleSendReminder(d)}
+                          >
+                            <WhatsAppIcon fontSize="small" />
+                          </IconButton>
+                        </MuiTooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -245,6 +348,188 @@ export const ReportsPage: React.FC = () => {
             </Grid>
           ) : (
             <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">Select date range to view payment breakdown</Typography></Paper>
+          )}
+        </Box>
+      )}
+
+      {tab === 3 && (
+        <Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'flex-end' }}>
+            <TextField
+              label="Month" type="month" size="small" InputLabelProps={{ shrink: true }}
+              value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+            {monthlyData && (
+              <Button variant="outlined" startIcon={<Download />} onClick={() => {
+                const rows = Object.entries(monthlyData.byGunta).map(([gunta, d]) => ({
+                  Gunta: gunta, Cash: d.cash, Online: d.online, Total: d.total, Invoices: d.count,
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Monthly');
+                XLSX.writeFile(wb, `monthly-summary-${selectedMonth}.xlsx`);
+              }}>Export Excel</Button>
+            )}
+          </Box>
+
+          {monthlyLoading ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+          ) : monthlyData ? (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Total Collected</Typography>
+                  <Typography variant="h4" fontWeight={600} color="primary">Rs. {monthlyData.grandTotal.toLocaleString()}</Typography>
+                  <Typography variant="body2">{monthlyData.invoiceCount} invoices</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Cash</Typography>
+                  <Typography variant="h4" fontWeight={600} color="success.main">Rs. {monthlyData.cashTotal.toLocaleString()}</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Online</Typography>
+                  <Typography variant="h4" fontWeight={600} color="info.main">Rs. {monthlyData.onlineTotal.toLocaleString()}</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>By Gunta</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Gunta</TableCell>
+                        <TableCell>Cash</TableCell>
+                        <TableCell>Online</TableCell>
+                        <TableCell>Total</TableCell>
+                        <TableCell>Invoices</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(monthlyData.byGunta).map(([gunta, d]) => (
+                        <TableRow key={gunta}>
+                          <TableCell><Typography fontWeight={500}>{gunta}</Typography></TableCell>
+                          <TableCell>Rs. {d.cash.toLocaleString()}</TableCell>
+                          <TableCell>Rs. {d.online.toLocaleString()}</TableCell>
+                          <TableCell><Typography fontWeight={600}>Rs. {d.total.toLocaleString()}</Typography></TableCell>
+                          <TableCell>{d.count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              </Grid>
+            </Grid>
+          ) : (
+            <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">No data for selected month</Typography></Paper>
+          )}
+        </Box>
+      )}
+
+      {tab === 4 && (
+        <Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <FormControl size="small" sx={{ minWidth: 200 }}>
+              <InputLabel>Gunta</InputLabel>
+              <Select value={selectedGuntaId} label="Gunta" onChange={(e) => setSelectedGuntaId(e.target.value)}>
+                <MenuItem value=""><em>Select Gunta</em></MenuItem>
+                {guntas?.map((g) => <MenuItem key={g._id} value={g._id}>{g.name}</MenuItem>)}
+              </Select>
+            </FormControl>
+            <TextField label="From Month" type="month" size="small" InputLabelProps={{ shrink: true }}
+              value={guntaFromMonth} onChange={(e) => setGuntaFromMonth(e.target.value)} />
+            <TextField label="To Month" type="month" size="small" InputLabelProps={{ shrink: true }}
+              value={guntaToMonth} onChange={(e) => setGuntaToMonth(e.target.value)} />
+            {guntaDetail && (
+              <>
+                <Button variant="outlined" startIcon={<Download />} onClick={exportGuntaDetailExcel}>Export Excel</Button>
+                <Button variant="outlined" startIcon={<Download />} onClick={exportGuntaDetailPDF}>Export PDF</Button>
+              </>
+            )}
+          </Box>
+
+          {guntaDetailLoading ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+          ) : guntaDetail ? (
+            <Box>
+              <Box sx={{ display: 'flex', gap: 3, mb: 3 }}>
+                <Card sx={{ flex: 1 }}><CardContent>
+                  <Typography color="text.secondary">Paid</Typography>
+                  <Typography variant="h5" fontWeight={600} color="success.main">Rs. {guntaDetail.paidTotal.toLocaleString()}</Typography>
+                  <Typography variant="body2">{guntaDetail.paid.length} customers</Typography>
+                </CardContent></Card>
+                <Card sx={{ flex: 1 }}><CardContent>
+                  <Typography color="text.secondary">Unpaid</Typography>
+                  <Typography variant="h5" fontWeight={600} color="error.main">Rs. {guntaDetail.unpaidTotal.toLocaleString()}</Typography>
+                  <Typography variant="body2">{guntaDetail.unpaid.length} customers</Typography>
+                </CardContent></Card>
+              </Box>
+
+              <Paper sx={{ mb: 3 }}>
+                <Box sx={{ p: 2, bgcolor: 'success.light', borderRadius: '4px 4px 0 0' }}>
+                  <Typography fontWeight={600} color="success.dark">Paid Customers</Typography>
+                </Box>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Room</TableCell>
+                      <TableCell>Customer</TableCell>
+                      <TableCell>Invoice #</TableCell>
+                      <TableCell>Amount</TableCell>
+                      <TableCell>Method</TableCell>
+                      <TableCell>Period</TableCell>
+                      <TableCell>Date</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {guntaDetail.paid.map((p: GuntaDetailPaidEntry) => (
+                      <TableRow key={p.customer._id}>
+                        <TableCell><Typography fontWeight={500}>{p.customer.roomNumber}</Typography></TableCell>
+                        <TableCell>{p.customer.nameEnglish}</TableCell>
+                        <TableCell>{p.invoice.invoiceNumber}</TableCell>
+                        <TableCell>Rs. {p.invoice.amountPaid}</TableCell>
+                        <TableCell><Chip label={p.invoice.paymentMethod} size="small" color={p.invoice.paymentMethod === 'Cash' ? 'success' : 'primary'} /></TableCell>
+                        <TableCell>{p.invoice.paidFromMonth} to {p.invoice.paidToMonth}</TableCell>
+                        <TableCell>{new Date(p.invoice.createdAt).toLocaleDateString()}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Paper>
+
+              <Paper>
+                <Box sx={{ p: 2, bgcolor: 'error.light', borderRadius: '4px 4px 0 0' }}>
+                  <Typography fontWeight={600} color="error.dark">Unpaid Customers</Typography>
+                </Box>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Room</TableCell>
+                      <TableCell>Customer</TableCell>
+                      <TableCell>Monthly Charge</TableCell>
+                      <TableCell>Pending Months</TableCell>
+                      <TableCell>Pending Amount</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {guntaDetail.unpaid.map((u: GuntaDetailUnpaidEntry) => (
+                      <TableRow key={u.customer._id}>
+                        <TableCell><Typography fontWeight={500}>{u.customer.roomNumber}</Typography></TableCell>
+                        <TableCell>{u.customer.nameEnglish}</TableCell>
+                        <TableCell>Rs. {u.customer.monthlyCharge}</TableCell>
+                        <TableCell><Chip label={u.pendingMonths} color="error" size="small" /></TableCell>
+                        <TableCell><Typography color="error" fontWeight={600}>Rs. {u.pendingAmount}</Typography></TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Paper>
+            </Box>
+          ) : (
+            <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">Select a gunta and month range to view the report</Typography></Paper>
           )}
         </Box>
       )}
