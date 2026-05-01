@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { body, param } from 'express-validator';
+import mongoose from 'mongoose';
 import * as guntaService from '../services/guntaService';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/apiResponse';
@@ -14,12 +15,14 @@ const validate = (req: Request) => {
 export const createValidation = [
   body('name').trim().notEmpty().withMessage('Gunta name is required'),
   body('description').optional().trim(),
+  body('assignedStaff').optional({ nullable: true }).custom((v) => v === null || v === '' || mongoose.isValidObjectId(v)).withMessage('Invalid assignedStaff ID'),
 ];
 
 export const updateValidation = [
   param('id').isMongoId().withMessage('Invalid gunta ID'),
   body('name').optional().trim().notEmpty().withMessage('Gunta name cannot be empty'),
   body('description').optional().trim(),
+  body('assignedStaff').optional({ nullable: true }).custom((v) => v === null || v === '' || mongoose.isValidObjectId(v)).withMessage('Invalid assignedStaff ID'),
 ];
 
 export const create = asyncHandler(async (req: Request, res: Response) => {
