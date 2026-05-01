@@ -17,8 +17,23 @@ export const ReportsPage: React.FC = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const monthStart = selectedMonth ? `${selectedMonth}-01` : '';
+  const monthEnd = selectedMonth
+    ? (() => {
+        const [y, m] = selectedMonth.split('-').map(Number);
+        const lastDay = new Date(y, m, 0).getDate();
+        return `${selectedMonth}-${String(lastDay).padStart(2, '0')}`;
+      })()
+    : '';
+
   const { data: defaulters, isLoading: defaultersLoading } = useDefaulters();
   const { data: collectionData, isLoading: collectionLoading } = useCollectionSummary(fromDate, toDate);
+  const { data: monthlyData, isLoading: monthlyLoading } = useCollectionSummary(monthStart, monthEnd);
 
   const exportDefaultersExcel = () => {
     if (!defaulters) return;
@@ -75,6 +90,7 @@ export const ReportsPage: React.FC = () => {
           <Tab label="Collection Summary" />
           <Tab label="Defaulters List" />
           <Tab label="Payment Breakdown" />
+          <Tab label="Monthly Summary" />
         </Tabs>
       </Paper>
 
@@ -245,6 +261,83 @@ export const ReportsPage: React.FC = () => {
             </Grid>
           ) : (
             <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">Select date range to view payment breakdown</Typography></Paper>
+          )}
+        </Box>
+      )}
+
+      {tab === 3 && (
+        <Box>
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'flex-end' }}>
+            <TextField
+              label="Month" type="month" size="small" InputLabelProps={{ shrink: true }}
+              value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)}
+            />
+            {monthlyData && (
+              <Button variant="outlined" startIcon={<Download />} onClick={() => {
+                const rows = Object.entries(monthlyData.byGunta).map(([gunta, d]) => ({
+                  Gunta: gunta, Cash: d.cash, Online: d.online, Total: d.total, Invoices: d.count,
+                }));
+                const ws = XLSX.utils.json_to_sheet(rows);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Monthly');
+                XLSX.writeFile(wb, `monthly-summary-${selectedMonth}.xlsx`);
+              }}>Export Excel</Button>
+            )}
+          </Box>
+
+          {monthlyLoading ? (
+            <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
+          ) : monthlyData ? (
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Total Collected</Typography>
+                  <Typography variant="h4" fontWeight={600} color="primary">Rs. {monthlyData.grandTotal.toLocaleString()}</Typography>
+                  <Typography variant="body2">{monthlyData.invoiceCount} invoices</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Cash</Typography>
+                  <Typography variant="h4" fontWeight={600} color="success.main">Rs. {monthlyData.cashTotal.toLocaleString()}</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12} md={4}>
+                <Card><CardContent>
+                  <Typography color="text.secondary">Online</Typography>
+                  <Typography variant="h4" fontWeight={600} color="info.main">Rs. {monthlyData.onlineTotal.toLocaleString()}</Typography>
+                </CardContent></Card>
+              </Grid>
+              <Grid item xs={12}>
+                <Paper sx={{ p: 3 }}>
+                  <Typography variant="h6" gutterBottom>By Gunta</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Gunta</TableCell>
+                        <TableCell>Cash</TableCell>
+                        <TableCell>Online</TableCell>
+                        <TableCell>Total</TableCell>
+                        <TableCell>Invoices</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Object.entries(monthlyData.byGunta).map(([gunta, d]) => (
+                        <TableRow key={gunta}>
+                          <TableCell><Typography fontWeight={500}>{gunta}</Typography></TableCell>
+                          <TableCell>Rs. {d.cash.toLocaleString()}</TableCell>
+                          <TableCell>Rs. {d.online.toLocaleString()}</TableCell>
+                          <TableCell><Typography fontWeight={600}>Rs. {d.total.toLocaleString()}</Typography></TableCell>
+                          <TableCell>{d.count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Paper>
+              </Grid>
+            </Grid>
+          ) : (
+            <Paper sx={{ p: 4, textAlign: 'center' }}><Typography color="text.secondary">No data for selected month</Typography></Paper>
           )}
         </Box>
       )}
