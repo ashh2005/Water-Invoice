@@ -20,7 +20,7 @@ export interface Gunta {
   _id: string;
   name: string;
   description?: string;
-  assignedStaff?: StaffUser | null;
+  assignedStaff?: StaffUser | string | null;
   createdAt: string;
   updatedAt: string;
 }
