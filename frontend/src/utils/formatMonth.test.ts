@@ -7,6 +7,11 @@ describe('formatMonth', () => {
     expect(formatMonth('2026-01')).toBe('Jan 2026');
     expect(formatMonth('2026-12')).toBe('Dec 2026');
   });
+
+  it('returns raw string for invalid input', () => {
+    expect(formatMonth('invalid')).toBe('invalid');
+    expect(formatMonth('')).toBe('');
+  });
 });
 
 describe('formatMonthRange', () => {
