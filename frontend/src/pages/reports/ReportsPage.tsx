@@ -3,8 +3,10 @@ import {
   Box, Paper, Typography, Tabs, Tab, TextField, Button, Table,
   TableHead, TableRow, TableCell, TableBody, CircularProgress,
   Card, CardContent, Grid, Chip, FormControl, InputLabel, Select, MenuItem,
+  Tooltip as MuiTooltip, IconButton,
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PageHeader } from '../../components/common/PageHeader';
 import { useDefaulters, useCollectionSummary, useGuntaDetail } from '../../hooks/useDashboard';
@@ -35,6 +37,18 @@ export const ReportsPage: React.FC = () => {
   const [selectedGuntaId, setSelectedGuntaId] = useState('');
   const [guntaFromMonth, setGuntaFromMonth] = useState('');
   const [guntaToMonth, setGuntaToMonth] = useState('');
+  const [remindedCustomerIds, setRemindedCustomerIds] = useState<Set<string>>(new Set());
+
+  const handleSendReminder = (d: Defaulter) => {
+    const name = d.customer.nameEnglish;
+    const amount = d.pendingAmount;
+    const months = d.pendingMonths;
+    const since = d.pendingFrom;
+    const message = `Dear ${name}, your water bill of Rs.${amount} is pending for ${months} month(s) since ${since}. Please pay at the earliest. Thank you.`;
+    const phone = d.customer.mobile.startsWith('+') ? d.customer.mobile.slice(1) : `91${d.customer.mobile}`;
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
+    setRemindedCustomerIds((prev) => new Set(prev).add(d.customer._id));
+  };
 
   const { data: defaulters, isLoading: defaultersLoading } = useDefaulters();
   const { data: collectionData, isLoading: collectionLoading } = useCollectionSummary(fromDate, toDate);
@@ -249,6 +263,7 @@ export const ReportsPage: React.FC = () => {
                     <TableCell>Pending Months</TableCell>
                     <TableCell>Pending Amount</TableCell>
                     <TableCell>Last Payment</TableCell>
+                    <TableCell>Actions</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -262,6 +277,17 @@ export const ReportsPage: React.FC = () => {
                       <TableCell><Chip label={d.pendingMonths} color="error" size="small" /></TableCell>
                       <TableCell><Typography color="error" fontWeight={600}>Rs. {d.pendingAmount}</Typography></TableCell>
                       <TableCell>{d.lastPaymentDate ? new Date(d.lastPaymentDate).toLocaleDateString() : 'Never'}</TableCell>
+                      <TableCell>
+                        <MuiTooltip title={remindedCustomerIds.has(d.customer._id) ? 'Reminder sent' : 'Send WhatsApp reminder'}>
+                          <IconButton
+                            size="small"
+                            color={remindedCustomerIds.has(d.customer._id) ? 'success' : 'default'}
+                            onClick={() => handleSendReminder(d)}
+                          >
+                            <WhatsAppIcon fontSize="small" />
+                          </IconButton>
+                        </MuiTooltip>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
