@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 
 import { AuthLayout } from './layouts/AuthLayout';
 import { DashboardLayout } from './layouts/DashboardLayout';
+import { StaffLayout } from './layouts/StaffLayout';
 import { LoginPage } from './pages/auth/LoginPage';
 import { DashboardPage } from './pages/dashboard/DashboardPage';
 import { GuntaManagementPage } from './pages/guntas/GuntaManagementPage';
@@ -44,7 +45,7 @@ function App() {
         } />
 
         <Route path="/payments" element={
-          <ProtectedRoute><DashboardLayout><PaymentPage /></DashboardLayout></ProtectedRoute>
+          <ProtectedRoute><StaffLayout><PaymentPage /></StaffLayout></ProtectedRoute>
         } />
 
         <Route path="/invoices" element={
