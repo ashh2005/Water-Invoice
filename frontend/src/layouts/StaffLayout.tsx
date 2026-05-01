@@ -1,4 +1,5 @@
 import { Box, AppBar, Toolbar, Typography, IconButton, Avatar } from '@mui/material';
+import { InstallBanner } from '../components/common/InstallBanner';
 import { Logout } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -42,6 +43,7 @@ export const StaffLayout: React.FC<StaffLayoutProps> = ({ children }) => {
       <Box component="main" sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         {children}
       </Box>
+      <InstallBanner />
     </Box>
   );
 };

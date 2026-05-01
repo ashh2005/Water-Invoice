@@ -5,6 +5,7 @@ import { useCustomerAuth } from '../../contexts/CustomerAuthContext';
 import { useCustomerDashboard, useCustomerInvoices, useInitiatePayment } from '../../hooks/useCustomerPortal';
 import { HeroStatusCard } from '../../components/customer-portal/HeroStatusCard';
 import { InvoiceCardList } from '../../components/customer-portal/InvoiceCardList';
+import { InstallBanner } from '../../components/common/InstallBanner';
 
 export const CustomerDashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -70,6 +71,7 @@ export const CustomerDashboardPage: React.FC = () => {
           </>
         ) : null}
       </Box>
+      <InstallBanner />
     </Box>
   );
 };
