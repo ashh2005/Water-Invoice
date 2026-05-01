@@ -32,3 +32,16 @@ function getCurrentMonth(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
+
+export const getGuntaDetail = asyncHandler(async (req: Request, res: Response) => {
+  const { guntaId, fromMonth, toMonth } = req.query;
+  if (!guntaId || !fromMonth || !toMonth) {
+    return sendSuccess(res, null, 'guntaId, fromMonth, and toMonth query params are required');
+  }
+  const data = await reportService.getGuntaDetail(
+    guntaId as string,
+    fromMonth as string,
+    toMonth as string
+  );
+  sendSuccess(res, data);
+});
