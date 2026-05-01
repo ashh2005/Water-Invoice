@@ -29,7 +29,7 @@ export const InvoicePage: React.FC = () => {
     fromDate: fromDate || undefined,
     toDate: toDate || undefined,
     paymentMethod: paymentMethod || undefined,
-    customerName: debouncedName || undefined,
+    customerName: debouncedName.trim() || undefined,
   });
   const markWhatsappSent = useMarkWhatsappSent();
 
